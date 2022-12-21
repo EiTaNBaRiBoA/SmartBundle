@@ -1,0 +1,7 @@
+ManifestFileVersion: 0
+CRC: 477165535
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: cueebundle
+      Dependencies: {}
