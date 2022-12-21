@@ -22,98 +22,85 @@ public class DownloadAssetBundle : MonoBehaviour
     }
     private IEnumerator DownloadSingleAssetBundle()
     {
-
-        using (UnityWebRequest www = UnityWebRequestAssetBundle.GetAssetBundle(url))
+        UnityWebRequest www;
+        if (writeToDisk)
+            www = UnityWebRequest.Get(url);
+        else
+            www = UnityWebRequestAssetBundle.GetAssetBundle(url);
+        yield return www.SendWebRequest();
+        if (www.result is UnityWebRequest.Result.ConnectionError or UnityWebRequest.Result.ProtocolError)
         {
-            yield return www.SendWebRequest();
-            if (www.result is UnityWebRequest.Result.ConnectionError or UnityWebRequest.Result.ProtocolError)
+            Debug.LogWarning("Server Request failed " + url + " " + www.error);
+        }
+        else
+        {
+
+            if (writeToDisk)
             {
-                Debug.LogWarning("Server Request failed " + url + " " + www.error);
+                string path = Path.GetFullPath(assetPathSave).Replace('/', '\\');
+                if (!Directory.Exists((path)))
+                {
+                    Directory.CreateDirectory((path));
+                }
+                assetPathSave = Path.Combine(assetPathSave, "r.unity3d");
+                //Save(www.downloadHandler.data, assetPathSave);
+                StartCoroutine(LoadObject(assetPathSave));
             }
             else
             {
                 AssetBundle bundle = DownloadHandlerAssetBundle.GetContent(www);
                 objectToInstantiate = bundle.LoadAsset(bundle.GetAllAssetNames()[0]) as GameObject;
-                if (writeToDisk)
+                bundle.Unload(false); // If asset is in the game should not be unloaded
+                yield return new WaitForEndOfFrame();
+
+                if (objectToInstantiate != null)
                 {
-                    string path = Path.GetFullPath(assetPathSave).Replace('/', '\\');
-                    Save(objectToInstantiate, path);
-                    LoadObject(path);
+                    Instantiate(objectToInstantiate, Vector3.zero, Quaternion.identity);
                 }
                 else
-                {
-                    bundle.Unload(false); // If asset is in the game should not be unloaded
-                    yield return new WaitForEndOfFrame();
-
-                    if (objectToInstantiate != null)
-                    {
-                        Instantiate(objectToInstantiate, Vector3.zero, Quaternion.identity);
-                    }
-                    else
-                        Debug.LogError("null Gameobject");
-                }
+                    Debug.LogError("null Gameobject");
             }
             www.Dispose(); // Unmanaged code
         }
     }
 
 
-    public bool Save(GameObject obj, string path)
+    public void Save(byte[] obj, string path)
     {
 
         Debug.Log(path);
-        if (!Directory.Exists((path)))
-        {
-            Directory.CreateDirectory((path));
-        }
 
-        path = path + "/Game.dat";
-        BinaryFormatter formatter = new BinaryFormatter();
-        FileStream stream = new FileStream(path, FileMode.Create);
-
-        formatter.Serialize(stream, obj);
-
-        stream.Close();
-
-        return true;
-    }
-
-    private void LoadObject(string path) // For read only access
-    {
-        GameObject newObj = null;
-        BinaryFormatter formatter = new BinaryFormatter();
-        FileStream stream = new FileStream(path, FileMode.Open);
         try
         {
-            newObj = formatter.Deserialize(stream) as GameObject;
-            stream.Close();
-
+            File.WriteAllBytes(path, obj);
+            Debug.Log("Saved Data to: " + path.Replace("/", "\\"));
         }
         catch (Exception e)
         {
-            stream.Close();
-            Debug.Log(e.Message);
+            Debug.LogWarning("Failed To Save Data to: " + path.Replace("/", "\\"));
+            Debug.LogWarning("Error: " + e.Message);
         }
     }
+    public GameObject testobject;
+    IEnumerator LoadObject(string path)
+    {
+        AssetBundleCreateRequest bundle = AssetBundle.LoadFromFileAsync(path);
+        yield return bundle;
+
+        AssetBundle myLoadedAssetBundle = bundle.assetBundle;
+        if (myLoadedAssetBundle == null)
+        {
+            Debug.Log("Failed to load AssetBundle!");
+            yield break;
+        }
+
+        AssetBundleRequest request = myLoadedAssetBundle.LoadAssetAsync<GameObject>(myLoadedAssetBundle.GetAllAssetNames()[0]);
+        yield return request;
+
+        testobject = request.asset as GameObject;
+        var obj = myLoadedAssetBundle.LoadAsset(myLoadedAssetBundle.GetAllAssetNames()[0]) as GameObject;
+        Instantiate(obj, Vector3.zero, Quaternion.identity);
+
+        myLoadedAssetBundle.Unload(false);
+    }
 }
-
-// private void saveFile(byte[] data)
-// {
-//     string path = Path.GetFullPath(assetPathSave).Replace('/', '\\');
-//     Debug.Log(path);
-//     if (!Directory.Exists((path)))
-//     {
-//         Directory.CreateDirectory((path));
-//     }
-
-//     try
-//     {
-//         File.WriteAllBytes(assetPathSave, data);
-//         Debug.Log("Saved Data to: " + path.Replace("/", "\\"));
-//     }
-//     catch (Exception e)
-//     {
-//         Debug.LogWarning("Failed To Save Data to: " + assetPathSave.Replace("/", "\\"));
-//         Debug.LogWarning("Error: " + e.Message);
-//     }
-// }
