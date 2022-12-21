@@ -43,7 +43,7 @@ public class DownloadAssetBundle : MonoBehaviour
                     Directory.CreateDirectory((path));
                 }
                 assetPathSave = Path.Combine(assetPathSave, "r.unity3d");
-                //Save(www.downloadHandler.data, assetPathSave);
+                Save(www.downloadHandler.data, assetPathSave);
                 StartCoroutine(LoadObject(assetPathSave));
             }
             else
@@ -67,8 +67,11 @@ public class DownloadAssetBundle : MonoBehaviour
 
     public void Save(byte[] obj, string path)
     {
-
-        Debug.Log(path);
+        if (File.Exists(path))
+        {
+            Debug.Log("Exist");
+            return;
+        }
 
         try
         {
