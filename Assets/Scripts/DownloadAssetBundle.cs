@@ -37,7 +37,7 @@ public class DownloadAssetBundle : MonoBehaviour
 
             if (writeToDisk)
             {
-                string path = Path.GetFullPath(assetPathSave).Replace('/', '\\');
+                string path = Path.GetFullPath(assetPathSave);
                 if (!Directory.Exists((path)))
                 {
                     Directory.CreateDirectory((path));
@@ -76,11 +76,11 @@ public class DownloadAssetBundle : MonoBehaviour
         try
         {
             File.WriteAllBytes(path, obj);
-            Debug.Log("Saved Data to: " + path.Replace("/", "\\"));
+            Debug.Log("Saved Data to: " + path);
         }
         catch (Exception e)
         {
-            Debug.LogWarning("Failed To Save Data to: " + path.Replace("/", "\\"));
+            Debug.LogWarning("Failed To Save Data to: " + path);
             Debug.LogWarning("Error: " + e.Message);
         }
     }

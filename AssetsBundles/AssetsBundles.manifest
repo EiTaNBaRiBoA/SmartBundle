@@ -1,7 +1,7 @@
 ManifestFileVersion: 0
-CRC: 477165535
+CRC: 1522856227
 AssetBundleManifest:
   AssetBundleInfos:
     Info_0:
-      Name: cueebundle
+      Name: cubebundle
       Dependencies: {}
