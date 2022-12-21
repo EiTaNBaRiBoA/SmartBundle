@@ -11,6 +11,7 @@ public class BundleCreator
     [MenuItem("Assets/BuildBundles")]
     private static void BuildAllAssetBundles()
     {
+        //if Want deploy use Application.persistentDataPath 
         string assetBundlePath = Application.dataPath + "/../AssetsBundles";
         string path = Path.GetFullPath(assetBundlePath).Replace('/', '\\');
         Debug.Log(path);
