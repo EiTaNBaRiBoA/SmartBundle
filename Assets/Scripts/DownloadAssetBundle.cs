@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -9,22 +10,24 @@ using UnityEngine.Networking;
 public class DownloadAssetBundle : MonoBehaviour
 {
     public string url = "https://drive.google.com/uc?id=1IWoxbMErjpE_oo8MWMeFCp0dEzcPcGxX&export=download";
+    public string urlzip = "https://drive.google.com/uc?id=15hBVXzhHQO0HoxKh6vVRBlZ8KiHpfkKr&export=download";
     public bool writeToDisk = false;
-    string assetPathSave;
+    public bool shouldReadZip = false;
+    private string assetPathSave;
     private GameObject objectToInstantiate = null;
     // Start is called before the first frame update
     void Start()
     {
         assetPathSave = Application.dataPath + "/../DownloadedAssets";
         StartCoroutine(DownloadSingleAssetBundle());
-
-
+        if (!writeToDisk)
+            shouldReadZip = writeToDisk;
     }
     private IEnumerator DownloadSingleAssetBundle()
     {
         UnityWebRequest www;
         if (writeToDisk)
-            www = UnityWebRequest.Get(url);
+            www = UnityWebRequest.Get(shouldReadZip ? urlzip : url);
         else
             www = UnityWebRequestAssetBundle.GetAssetBundle(url);
         yield return www.SendWebRequest();
@@ -38,13 +41,16 @@ public class DownloadAssetBundle : MonoBehaviour
             if (writeToDisk)
             {
                 string path = Path.GetFullPath(assetPathSave);
+                string objectToOpen = Path.Combine(assetPathSave, "cubebundle");
                 if (!Directory.Exists((path)))
                 {
                     Directory.CreateDirectory((path));
                 }
-                assetPathSave = Path.Combine(assetPathSave, "r.unity3d");
-                Save(www.downloadHandler.data, assetPathSave);
-                StartCoroutine(LoadObject(assetPathSave));
+                if (shouldReadZip)
+                    assetPathSave = Path.Combine(assetPathSave, "r.zip");
+                Save(www.downloadHandler.data, path, assetPathSave);
+                StartCoroutine(LoadObject(objectToOpen));
+
             }
             else
             {
@@ -64,23 +70,23 @@ public class DownloadAssetBundle : MonoBehaviour
         }
     }
 
-
-    public void Save(byte[] obj, string path)
+    public void Save(byte[] obj, string folder, string file)
     {
-        if (File.Exists(path))
-        {
-            Debug.Log("Exist");
-            return;
-        }
-
         try
         {
-            File.WriteAllBytes(path, obj);
-            Debug.Log("Saved Data to: " + path);
+            if (!File.Exists(file))
+                File.WriteAllBytes(file, obj); // will access denied if folder path
+            if (shouldReadZip)
+            {
+                Debug.Log("Unzip");
+                ZipFile.ExtractToDirectory(file, folder, true);
+            }
+            File.Delete(file);
+
         }
         catch (Exception e)
         {
-            Debug.LogWarning("Failed To Save Data to: " + path);
+            Debug.LogWarning("Failed To Save Data to: " + folder);
             Debug.LogWarning("Error: " + e.Message);
         }
     }

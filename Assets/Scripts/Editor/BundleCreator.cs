@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using UnityEditor;
 using UnityEngine;
 
@@ -24,6 +25,7 @@ public class BundleCreator
         try
         {
             BuildPipeline.BuildAssetBundles(assetBundlePath, BuildAssetBundleOptions.None, EditorUserBuildSettings.activeBuildTarget);
+            ZipFile.CreateFromDirectory(assetBundlePath, assetBundlePath + ".zip");
         }
         catch (Exception e)
         {
