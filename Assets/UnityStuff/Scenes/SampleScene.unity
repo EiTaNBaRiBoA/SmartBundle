@@ -452,5 +452,5 @@ MonoBehaviour:
   url: https://drive.google.com/uc?id=1IWoxbMErjpE_oo8MWMeFCp0dEzcPcGxX&export=download
   urlzip: https://drive.google.com/uc?id=15hBVXzhHQO0HoxKh6vVRBlZ8KiHpfkKr&export=download
   writeToDisk: 1
-  shouldReadZip: 1
+  shouldDownloadZip: 1
   testobject: {fileID: 0}

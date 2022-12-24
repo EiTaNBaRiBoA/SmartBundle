@@ -4,30 +4,64 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Runtime.Serialization.Formatters.Binary;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Networking;
 
 public class DownloadAssetBundle : MonoBehaviour
 {
+    #region Const Var
+    private const int ZIP_LEAD_BYTES = 0x04034b50;
+    private const ushort GZIP_LEAD_BYTES = 0x8b1f;
+    #endregion
+
+
+    #region Test Urls
+
     public string url = "https://drive.google.com/uc?id=1IWoxbMErjpE_oo8MWMeFCp0dEzcPcGxX&export=download";
     public string urlzip = "https://drive.google.com/uc?id=15hBVXzhHQO0HoxKh6vVRBlZ8KiHpfkKr&export=download";
     public bool writeToDisk = false;
-    public bool shouldReadZip = false;
+    public bool shouldDownloadZip = false;
+
+    #endregion
+
+    #region Properties
     private string assetPathSave;
     private GameObject objectToInstantiate = null;
-    // Start is called before the first frame update
+
+    #endregion
+
+    #region Static Methods
+    /// <param name="data">reading file bytes</param>
+    /// <returns>if is compressed type PK</returns>
+    public static bool IsPkZipCompressedData(byte[] data)
+    {
+        Debug.Assert(data != null && data.Length >= 4);
+        // if the first 4 bytes of the array are the ZIP signature then it is compressed data
+        return (BitConverter.ToInt32(data, 0) == ZIP_LEAD_BYTES);
+    }
+
+    /// <param name="data">reading file bytes</param>
+    /// <returns>if is compressed type Gzip</returns>
+    public static bool IsGZipCompressedData(byte[] data)
+    {
+        Debug.Assert(data != null && data.Length >= 2);
+        // if the first 2 bytes of the array are theG ZIP signature then it is compressed data;
+        return (BitConverter.ToUInt16(data, 0) == GZIP_LEAD_BYTES);
+    }
+    #endregion
+
+
     void Start()
     {
         assetPathSave = Application.dataPath + "/../DownloadedAssets";
-        StartCoroutine(DownloadSingleAssetBundle());
-        if (!writeToDisk)
-            shouldReadZip = writeToDisk;
+        StartCoroutine(WebRequestQuery());
     }
-    private IEnumerator DownloadSingleAssetBundle()
+    private IEnumerator WebRequestQuery()
     {
         UnityWebRequest www;
         if (writeToDisk)
-            www = UnityWebRequest.Get(shouldReadZip ? urlzip : url);
+            www = UnityWebRequest.Get(shouldDownloadZip ? urlzip : url);
         else
             www = UnityWebRequestAssetBundle.GetAssetBundle(url);
         yield return www.SendWebRequest();
@@ -37,63 +71,63 @@ public class DownloadAssetBundle : MonoBehaviour
         }
         else
         {
-
             if (writeToDisk)
             {
-                string path = Path.GetFullPath(assetPathSave);
-                string objectToOpen = Path.Combine(assetPathSave, "cubebundle");
-                if (!Directory.Exists((path)))
-                {
-                    Directory.CreateDirectory((path));
-                }
-                if (shouldReadZip)
-                    assetPathSave = Path.Combine(assetPathSave, "r.zip");
-                Save(www.downloadHandler.data, path, assetPathSave);
-                StartCoroutine(LoadObject(objectToOpen));
-
+                string folderPath = Path.GetFullPath(assetPathSave);
+                string assetFileName = Path.Combine(assetPathSave, "cubebundle"); //The name of the asset to instantiate the gameobject
+                Save(www.downloadHandler.data, folderPath, assetPathSave, assetFileName);
             }
             else
             {
-                AssetBundle bundle = DownloadHandlerAssetBundle.GetContent(www);
-                objectToInstantiate = bundle.LoadAsset(bundle.GetAllAssetNames()[0]) as GameObject;
-                bundle.Unload(false); // If asset is in the game should not be unloaded
-                yield return new WaitForEndOfFrame();
-
-                if (objectToInstantiate != null)
-                {
-                    Instantiate(objectToInstantiate, Vector3.zero, Quaternion.identity);
-                }
-                else
-                    Debug.LogError("null Gameobject");
+                StartCoroutine(AssetNotStoredDisk(DownloadHandlerAssetBundle.GetContent(www)));
             }
-            www.Dispose(); // Unmanaged code
+            www.Dispose();
         }
     }
 
-    public void Save(byte[] obj, string folder, string file)
+
+    public async void Save(byte[] data, string folder, string file, string assetFileName)
     {
+        if (!Directory.Exists((folder)))
+        {
+            Directory.CreateDirectory((folder));
+        }
+        bool shouldUnZip = false;
+        if (IsPkZipCompressedData(data) || IsGZipCompressedData(data))
+        {
+            shouldUnZip = true;
+            file = Path.Combine(assetPathSave, "Asset.zip");
+        }
+        else
+            file = Path.Combine(assetPathSave, "AssetBundle");
+
+
         try
         {
+
             if (!File.Exists(file))
-                File.WriteAllBytes(file, obj); // will access denied if folder path
-            if (shouldReadZip)
+                File.WriteAllBytes(file, data); // will access denied if folder path
+            if (shouldUnZip)
             {
                 Debug.Log("Unzip");
-                ZipFile.ExtractToDirectory(file, folder, true);
+                await Task.Run(() => ZipFile.ExtractToDirectory(file, folder, true));
+                File.Delete(file);
             }
-            File.Delete(file);
-
         }
         catch (Exception e)
         {
             Debug.LogWarning("Failed To Save Data to: " + folder);
             Debug.LogWarning("Error: " + e.Message);
         }
+        finally
+        {
+            StartCoroutine(LoadObject(assetFileName));
+        }
     }
     public GameObject testobject;
-    IEnumerator LoadObject(string path)
+    IEnumerator LoadObject(string filePath)
     {
-        AssetBundleCreateRequest bundle = AssetBundle.LoadFromFileAsync(path);
+        AssetBundleCreateRequest bundle = AssetBundle.LoadFromFileAsync(filePath);
         yield return bundle;
 
         AssetBundle myLoadedAssetBundle = bundle.assetBundle;
@@ -112,4 +146,19 @@ public class DownloadAssetBundle : MonoBehaviour
 
         myLoadedAssetBundle.Unload(false);
     }
+
+    private IEnumerator AssetNotStoredDisk(AssetBundle bundle)
+    {
+        objectToInstantiate = bundle.LoadAsset(bundle.GetAllAssetNames()[0]) as GameObject;
+        bundle.Unload(false); // If asset is in the game should not be unloaded
+        yield return new WaitForEndOfFrame();
+
+        if (objectToInstantiate != null)
+        {
+            Instantiate(objectToInstantiate, Vector3.zero, Quaternion.identity);
+        }
+        else
+            Debug.LogError("null Gameobject");
+    }
+
 }
